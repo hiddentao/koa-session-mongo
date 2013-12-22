@@ -14,7 +14,7 @@ npm install koa-session-mongo
 
 ```js
 var session = require('koa-session-store');
-var mongoSession = require('koa-session-mongo');
+var mongoStore = require('koa-session-mongo');
 var koa = require('koa');
 
 var app = koa();
@@ -22,7 +22,7 @@ var app = koa();
 app.keys = ['some secret key'];  // needed for cookie-signing
 
 app.use(session({
-  store: mongoSession.create({
+  store: mongoStore.create({
     db: 'database_name'
   })
 }));
@@ -42,7 +42,7 @@ console.log('listening on port 3000');
 If you wish to specify host, port, etc:
 
 ```js
-var store = mongoSession.create({
+var store = mongoStore.create({
   host: 'mongo.hostname.com',
   port: 48473,
   db: 'database_name',
@@ -54,7 +54,7 @@ var store = mongoSession.create({
 Or you can pass in connection parameters as a URL string:
 
 ```js
-var store = mongoSession.create({
+var store = mongoStore.create({
   url: 'mongodb://user:pass@host:port/database_name/collection_name'
 })
 ```
@@ -66,7 +66,7 @@ var mongo = require('mongodb');
 
 var db = new mongo.Db("database_name", new mongo.Server('host', port, {}), { w: 1 });
 
-var store = mongoSession.create({
+var store = mongoStore.create({
   db: dbConn,
   collection: 'sessions',
   username: 'admin',
@@ -81,7 +81,7 @@ var mongoose = require('mongoose');
 
 mongoose.connect(...);
 
-var store = mongoSession.create({
+var store = mongoStore.create({
   mongoose: mongoose.connection
 })
 ```
