@@ -99,7 +99,7 @@ The following configuration options are available for the `create()` call:
   * **password** `String` - password. Default is _null_.
   * **auto_reconnect** `Boolean` - gets passed to the [node-mongo-native](https://github.com/mongodb/node-mongodb-native) constructor as the same option. Default is _false_.
   * **ssl** `Boolean` - use ssl to connect to the server. Default is _false_.
-  * **defaultExpirationTimeMs** `Number` - time-to-live (TTL) in milliseconds for any given session data - MongoDB will auto-delete data which hasn't been updated for this amount of time. Default is 2 weeks.
+  * **expirationTime** `Number` - time-to-live (TTL) in seconds for any given session data - MongoDB will auto-delete data which hasn't been updated for this amount of time. Default is 2 weeks.
   * **url** `String` - connection URL of the form** `mongodb://user:pass@host:port/database/collection`. If provided then this will take precedence over other options except** `mongoose`.
   * **mongoose** `Object` - a [Mongoose](https://github.com/LearnBoost/mongoose) connection, use** `mongoose.connection` to get the connection out of an existing Mongoose object.  If provided then this will take precedence over other options.
 

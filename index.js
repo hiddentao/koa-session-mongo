@@ -21,7 +21,7 @@ var defaultOptions = {
   collection: 'sessions',
   auto_reconnect: false,
   ssl: false,
-  defaultExpirationTimeMs: 1000 * 60 * 60 * 24 * 14,    // 2 weeks
+  expirationTime: 60 * 60 * 24 * 14,    // 2 weeks
   w: 1
 };
 
@@ -34,10 +34,9 @@ var defaultOptions = {
  * @constructor
  */
 var MongoStore = function(collection) {
-  this._collection = collection;
-  this._findOne = Promise.promisify(this._collection.findOne, this._collection);
-  this._update = Promise.promisify(this._collection.update, this._collection);
-  this._remove = Promise.promisify(this._collection.remove, this._collection);
+  this._findOne = Promise.promisify(collection.findOne, collection);
+  this._update = Promise.promisify(collection.update, collection);
+  this._remove = Promise.promisify(collection.remove, collection);
 };
 
 
@@ -82,6 +81,11 @@ MongoStore.prototype.remove = function*(sid) {
 };
 
 
+/**
+ * List of opened db connections. So that we can cleanup later on.
+ * @type {Array}
+ */
+var openedDbConnections = [];
 
 
 
@@ -102,6 +106,7 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
   try {
     debug('open db connection');
     openedDb = yield Promise.promisify(dbConn.open, dbConn)();
+    openedDbConnections.push(openedDb);
   } catch (err) {
     if (!(err instanceof Error)) {
       err = new Error(String(err));
@@ -128,8 +133,8 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
   }
 
   try {
-    var expirationTime = options.expirationTime || options.defaultExpirationTime;
-    debug('create index on updatedAt with expiry %d', expirationTime);
+    var expirationTime = (undefined !== options.expirationTime ? options.expirationTime : defaultOptions.expirationTime);
+    debug('create index on updatedAt with expiry after %d seconds', expirationTime);
     yield Promise.promisify(collection.ensureIndex, collection)({updatedAt: 1}, {expireAfterSeconds: expirationTime});
   } catch (err) {
     throw new Error('Error creating index on ' + collectionName + ': ' + err.message);
@@ -137,6 +142,20 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
 
   return collection;
 });
+
+
+/**
+ * Close all opened db connections.
+ */
+exports.closeConnections = function*() {
+  for (var i in openedDbConnections) {
+    var conn = openedDbConnections[i];
+    if (conn && conn.close) {
+      yield Promise.promisify(conn.close, conn)(true);
+    }
+  }
+};
+
 
 
 
@@ -153,7 +172,7 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
  * @param options.password {String} password. Default is null.
  * @param options.auto_reconnect {Boolean} gets passed to the node-mongo-native constructor as the same option. Default is false.
  * @param options.ssl {Boolean} use ssl to connect to the server. Default is false.
- * @param options.defaultExpirationTimeMs {Number} time-to-live (TTL) in milliseconds for any given session data - mongod will auto-delete data
+ * @param options.expirationTime {Number} time-to-live (TTL) in seconds for any given session data - mongod will auto-delete data
  * which hasn't been updated for this amount of time. Default is 2 weeks.
  *
  * @param options.url {String} connection URL of the form: mongodb://user:pass@host:port/database/collection. If provided then
@@ -167,17 +186,17 @@ exports.create = function*(options) {
   var dbConn = null;
 
   // mongoose connection?
-  if (options.mongoose_connection) {
+  if (options.mongoose) {
     debug('extract params from mongoose connection');
-    if (options.mongoose_connection.user && options.mongoose_connection.pass) {
-      options.username = options.mongoose_connection.user;
-      options.password = options.mongoose_connection.pass;
+    if (options.mongoose.user && options.mongoose.pass) {
+      options.username = options.mongoose.user;
+      options.password = options.mongoose.pass;
     }
 
-    dbConn = new mongo.Db(options.mongoose_connection.db.databaseName,
-      new mongo.Server(options.mongoose_connection.db.serverConfig.host,
-        options.mongoose_connection.db.serverConfig.port,
-        options.mongoose_connection.db.serverConfig.options
+    dbConn = new mongo.Db(options.mongoose.db.databaseName,
+      new mongo.Server(options.mongoose.db.serverConfig.host,
+        options.mongoose.db.serverConfig.port,
+        options.mongoose.db.serverConfig.options
       ), { w: defaultOptions.w }
     );
 
@@ -193,7 +212,7 @@ exports.create = function*(options) {
         options.port = parseInt(db_url.port);
       }
 
-      if (undefined !== db_url.pathname) {
+      if (db_url.pathname) {
         var pathname = db_url.pathname.split('/');
 
         if (pathname.length >= 2 && pathname[1]) {
@@ -205,11 +224,11 @@ exports.create = function*(options) {
         }
       }
 
-      if (undefined !== db_url.hostname) {
+      if (db_url.hostname) {
         options.host = db_url.hostname;
       }
 
-      if (undefined !== db_url.auth) {
+      if (db_url.auth) {
         var auth = db_url.auth.split(':');
 
         if (auth.length >= 1) {
