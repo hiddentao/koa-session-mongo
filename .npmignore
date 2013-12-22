@@ -2,3 +2,6 @@ test.js
 gulpfile.js
 .gitignore
 .travis.yml
+*.iml
+.idea
+npm-debug.log
