@@ -16,7 +16,7 @@ var expect = chai.expect,
 var Promise = require('bluebird');
 
 var mongoSession = require('../');
-var createSession = Promise.coroutine(mongoSession.create),
+var createSession = Promise.method(mongoSession.create),
   closeConnections = Promise.coroutine(mongoSession.closeConnections);
 
 var mongo = require('mongodb');

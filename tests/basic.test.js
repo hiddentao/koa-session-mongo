@@ -12,7 +12,7 @@ var expect = chai.expect,
 var Promise = require('bluebird');
 
 var mongoSession = require('../');
-var createSession = Promise.coroutine(mongoSession.create),
+var createSession = Promise.method(mongoSession.create),
   closeConnections = Promise.coroutine(mongoSession.closeConnections);
 
 var mongo = require('mongodb');
@@ -21,13 +21,6 @@ var mongoose = require('mongoose');
 
 describe('Mongo session layer tests', function() {
   var testDb, testCollection;
-
-//  var options = {
-//    host: '127.0.0.1',
-//    port: 27017,
-//    db: 'koa-session-mongo-test'
-//  };
-//
 
   before(function(done) {
     console.log('Assuming that Mongod is running on 127.0.0.1 at port 27017');
@@ -79,92 +72,15 @@ describe('Mongo session layer tests', function() {
       Promise.promisify(testMongoNativeDb.close, testMongoNativeDb)(true).nodeify(done);
     });
 
-    describe('normally', function() {
-
-      it('connects successfully', function() {
-        return createSession(options).should.be.fulfilled;
-      });
-
-      it('returns the store', function(done) {
-        createSession(options)
-          .then(function(store) {
-            store.save.should.be.a('function');
-            store.load.should.be.a('function');
-            store.remove.should.be.a('function');
-          })
-          .nodeify(done)
-        ;
-      });
-
-      describe('once the store is ready', function() {
-        var store, sid;
-
-        beforeEach(function(done) {
-          sid = mongoose.Types.ObjectId();
-
-          createSession(options)
-            .then(function(_store) {
-              store = {
-                save: Promise.coroutine(_store.save).bind(_store),
-                load: Promise.coroutine(_store.load).bind(_store),
-                remove: Promise.coroutine(_store.remove).bind(_store)
-              };
-            })
-            .then(function() {
-              return testCollection.remove();
-            })
-            .nodeify(done)
-          ;
-        });
-
-        it('can save new items', function() {
-          return store.save(sid, 'data1')
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can overwrite items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.save(sid, 'data1')
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can load items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.load(sid);
-            })
-            .then(function(data) {
-              data.should.eql('hell');
-            });
-        });
-
-        it('can remove items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.remove(sid);
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(data) {
-              expect(data).to.eql(null);
-            });
-        });
-
-      });
-
+    it('returns the store', function(done) {
+      createSession(options)
+        .then(function(store) {
+          store.save.should.be.a('function');
+          store.load.should.be.a('function');
+          store.remove.should.be.a('function');
+        })
+        .nodeify(done)
+      ;
     });
 
     describe('when incorrect auth given', function() {
@@ -172,8 +88,81 @@ describe('Mongo session layer tests', function() {
         return createSession(_.extend({}, options, {
           username: 'admin',
           password: 'password'
-        })).should.be.rejectedWith('Error authenticating with admin: auth fails');
+        }))
+          .then(function(store){
+            return Promise.coroutine(store.load).bind(store)('abc');
+          })
+          .should.be.rejectedWith('Error authenticating with admin: auth fails');
       });
+    });
+
+    describe('once the store is ready', function() {
+      var store, sid;
+
+      beforeEach(function(done) {
+        sid = mongoose.Types.ObjectId();
+
+        createSession(options)
+          .then(function(_store) {
+            store = {
+              save: Promise.coroutine(_store.save).bind(_store),
+              load: Promise.coroutine(_store.load).bind(_store),
+              remove: Promise.coroutine(_store.remove).bind(_store)
+            };
+          })
+          .then(function() {
+            return testCollection.remove();
+          })
+          .nodeify(done)
+        ;
+      });
+
+      it('can save new items', function() {
+        return store.save(sid, 'data1')
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
+
+      it('can overwrite items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.save(sid, 'data1')
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
+
+      it('can load items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.load(sid);
+          })
+          .then(function(data) {
+            data.should.eql('hell');
+          });
+      });
+
+      it('can remove items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.remove(sid);
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(data) {
+            expect(data).to.eql(null);
+          });
+      });
+
     });
 
   });
@@ -187,100 +176,96 @@ describe('Mongo session layer tests', function() {
       };
     });
 
-    describe('normally', function() {
-
-      it('connects successfully', function() {
-        return createSession(options).should.be.fulfilled;
-      });
-
-      it('returns the store', function(done) {
-        createSession(options)
-          .then(function(store) {
-            store.save.should.be.a('function');
-            store.load.should.be.a('function');
-            store.remove.should.be.a('function');
-          })
-          .nodeify(done)
-        ;
-      });
-
-      describe('once the store is ready', function() {
-        var store, sid;
-
-        beforeEach(function(done) {
-          sid = mongoose.Types.ObjectId();
-
-          createSession(options)
-            .then(function(_store) {
-              store = {
-                save: Promise.coroutine(_store.save).bind(_store),
-                load: Promise.coroutine(_store.load).bind(_store),
-                remove: Promise.coroutine(_store.remove).bind(_store)
-              };
-            })
-            .then(function() {
-              return testCollection.remove();
-            })
-            .nodeify(done)
-          ;
-        });
-
-        it('can save new items', function() {
-          return store.save(sid, 'data1')
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can overwrite items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.save(sid, 'data1')
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can load items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.load(sid);
-            })
-            .then(function(data) {
-              data.should.eql('hell');
-            });
-        });
-
-        it('can remove items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.remove(sid);
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(data) {
-              expect(data).to.eql(null);
-            });
-        });
-
-      });
-
+    it('returns the store', function(done) {
+      createSession(options)
+        .then(function(store) {
+          store.save.should.be.a('function');
+          store.load.should.be.a('function');
+          store.remove.should.be.a('function');
+        })
+        .nodeify(done)
+      ;
     });
 
     describe('when incorrect auth given', function() {
       it('fails to connect', function() {
         return createSession({
           url: 'mongodb://admin:password@127.0.0.1:27017/koa-session-mongo-test/sessions'
-        }).should.be.rejectedWith('Error authenticating with admin: auth fails');
+        })
+          .then(function(store){
+            return Promise.coroutine(store.load).bind(store)('abc');
+          })
+          .should.be.rejectedWith('Error authenticating with admin: auth fails');
       });
+    });
+
+    describe('once the store is ready', function() {
+      var store, sid;
+
+      beforeEach(function(done) {
+        sid = mongoose.Types.ObjectId();
+
+        createSession(options)
+          .then(function(_store) {
+            store = {
+              save: Promise.coroutine(_store.save).bind(_store),
+              load: Promise.coroutine(_store.load).bind(_store),
+              remove: Promise.coroutine(_store.remove).bind(_store)
+            };
+          })
+          .then(function() {
+            return testCollection.remove();
+          })
+          .nodeify(done)
+        ;
+      });
+
+      it('can save new items', function() {
+        return store.save(sid, 'data1')
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
+
+      it('can overwrite items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.save(sid, 'data1')
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
+
+      it('can load items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.load(sid);
+          })
+          .then(function(data) {
+            data.should.eql('hell');
+          });
+      });
+
+      it('can remove items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.remove(sid);
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(data) {
+            expect(data).to.eql(null);
+          });
+      });
+
     });
 
   });
@@ -299,90 +284,82 @@ describe('Mongo session layer tests', function() {
       Promise.promisify(mongoose.disconnect, mongoose)().nodeify(done);
     });
 
-    describe('normally', function() {
+    it('returns the store', function(done) {
+      createSession(options)
+        .then(function(store) {
+          store.save.should.be.a('function');
+          store.load.should.be.a('function');
+          store.remove.should.be.a('function');
+        })
+        .nodeify(done)
+      ;
+    });
 
-      it('connects successfully', function() {
-        return createSession(options).should.be.fulfilled;
-      });
+    describe('once the store is ready', function() {
+      var store, sid;
 
-      it('returns the store', function(done) {
+      beforeEach(function(done) {
+        sid = mongoose.Types.ObjectId();
+
         createSession(options)
-          .then(function(store) {
-            store.save.should.be.a('function');
-            store.load.should.be.a('function');
-            store.remove.should.be.a('function');
+          .then(function(_store) {
+            store = {
+              save: Promise.coroutine(_store.save).bind(_store),
+              load: Promise.coroutine(_store.load).bind(_store),
+              remove: Promise.coroutine(_store.remove).bind(_store)
+            };
+          })
+          .then(function() {
+            return testCollection.remove();
           })
           .nodeify(done)
         ;
       });
 
-      describe('once the store is ready', function() {
-        var store, sid;
+      it('can save new items', function() {
+        return store.save(sid, 'data1')
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
 
-        beforeEach(function(done) {
-          sid = mongoose.Types.ObjectId();
+      it('can overwrite items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.save(sid, 'data1')
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
 
-          createSession(options)
-            .then(function(_store) {
-              store = {
-                save: Promise.coroutine(_store.save).bind(_store),
-                load: Promise.coroutine(_store.load).bind(_store),
-                remove: Promise.coroutine(_store.remove).bind(_store)
-              };
-            })
-            .then(function() {
-              return testCollection.remove();
-            })
-            .nodeify(done)
-          ;
-        });
+      it('can load items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.load(sid);
+          })
+          .then(function(data) {
+            data.should.eql('hell');
+          });
+      });
 
-        it('can save new items', function() {
-          return store.save(sid, 'data1')
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can overwrite items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.save(sid, 'data1')
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can load items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.load(sid);
-            })
-            .then(function(data) {
-              data.should.eql('hell');
-            });
-        });
-
-        it('can remove items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.remove(sid);
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(data) {
-              expect(data).to.eql(null);
-            });
-        });
-
+      it('can remove items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.remove(sid);
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(data) {
+            expect(data).to.eql(null);
+          });
       });
 
     });
@@ -400,92 +377,15 @@ describe('Mongo session layer tests', function() {
       };
     });
 
-    describe('normally', function() {
-
-      it('connects successfully', function() {
-        return createSession(options).should.be.fulfilled;
-      });
-
-      it('returns the store', function(done) {
-        createSession(options)
-          .then(function(store) {
-            store.save.should.be.a('function');
-            store.load.should.be.a('function');
-            store.remove.should.be.a('function');
-          })
-          .nodeify(done)
-        ;
-      });
-
-      describe('once the store is ready', function() {
-        var store, sid;
-
-        beforeEach(function(done) {
-          sid = mongoose.Types.ObjectId();
-
-          createSession(options)
-            .then(function(_store) {
-              store = {
-                save: Promise.coroutine(_store.save).bind(_store),
-                load: Promise.coroutine(_store.load).bind(_store),
-                remove: Promise.coroutine(_store.remove).bind(_store)
-              };
-            })
-            .then(function() {
-              return testCollection.remove();
-            })
-            .nodeify(done)
-          ;
-        });
-
-        it('can save new items', function() {
-          return store.save(sid, 'data1')
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can overwrite items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.save(sid, 'data1')
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(foundItem) {
-              foundItem.blob.should.eql('data1');
-            });
-        });
-
-        it('can load items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.load(sid);
-            })
-            .then(function(data) {
-              data.should.eql('hell');
-            });
-        });
-
-        it('can remove items', function() {
-          return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
-            .then(function() {
-              return store.remove(sid);
-            })
-            .then(function() {
-              return testCollection.findOne({_id: sid});
-            })
-            .then(function(data) {
-              expect(data).to.eql(null);
-            });
-        });
-
-      });
-
+    it('returns the store', function(done) {
+      createSession(options)
+        .then(function(store) {
+          store.save.should.be.a('function');
+          store.load.should.be.a('function');
+          store.remove.should.be.a('function');
+        })
+        .nodeify(done)
+      ;
     });
 
     describe('when incorrect auth given', function() {
@@ -493,12 +393,84 @@ describe('Mongo session layer tests', function() {
         return createSession(_.extend(options, {
           username: 'admin',
           password: 'password'
-        })).should.be.rejectedWith('Error authenticating with admin: auth fails');
+        }))
+          .then(function(store){
+            return Promise.coroutine(store.load).bind(store)('abc');
+          })
+          .should.be.rejectedWith('Error authenticating with admin: auth fails');
       });
     });
 
-  });
+    describe('once the store is ready', function() {
+      var store, sid;
 
+      beforeEach(function(done) {
+        sid = mongoose.Types.ObjectId();
+
+        createSession(options)
+          .then(function(_store) {
+            store = {
+              save: Promise.coroutine(_store.save).bind(_store),
+              load: Promise.coroutine(_store.load).bind(_store),
+              remove: Promise.coroutine(_store.remove).bind(_store)
+            };
+          })
+          .then(function() {
+            return testCollection.remove();
+          })
+          .nodeify(done)
+        ;
+      });
+
+      it('can save new items', function() {
+        return store.save(sid, 'data1')
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
+
+      it('can overwrite items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.save(sid, 'data1')
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(foundItem) {
+            foundItem.blob.should.eql('data1');
+          });
+      });
+
+      it('can load items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.load(sid);
+          })
+          .then(function(data) {
+            data.should.eql('hell');
+          });
+      });
+
+      it('can remove items', function() {
+        return testCollection.update({ _id: sid }, {$set: {blob: 'hell'}}, {upsert:true, safe:true})
+          .then(function() {
+            return store.remove(sid);
+          })
+          .then(function() {
+            return testCollection.findOne({_id: sid});
+          })
+          .then(function(data) {
+            expect(data).to.eql(null);
+          });
+      });
+
+    });
+
+  });
 
   describe('when an entry gets overwritten', function() {
     var store, sid;

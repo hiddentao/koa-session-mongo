@@ -18,31 +18,24 @@ var session = require('koa-session-store');
 var mongoStore = require('koa-session-mongo');
 var koa = require('koa');
 
-Promise.spawn(function*() {
-  var app = koa();
+var app = koa();
 
-  app.keys = ['some secret key'];  // needed for cookie-signing
+app.keys = ['some secret key'];  // needed for cookie-signing
 
-  // could instead use Promise.coroutine() here if we like
-  var sessionStore = yield Promise.spawn(function() {
-    return mongoStore.create({
-      db: 'database_name'
-    });
-  });
+app.use(session({
+  store: mongoStore.create({
+    db: 'database_name'
+  })
+}));
 
-  app.use(session({
-    store: sessionStore
-  }));
-
-  app.use(function *(){
-      var n = this.session.views || 0;
-      this.session.views = ++n;
-      this.body = n + ' views';
-  });
-
-  app.listen(3000);
-  console.log('listening on port 3000');
+app.use(function *(){
+    var n = this.session.views || 0;
+    this.session.views = ++n;
+    this.body = n + ' views';
 });
+
+app.listen(3000);
+console.log('listening on port 3000');
 ```
 
 If you wish to specify host, port, etc:
@@ -108,6 +101,21 @@ The following configuration options are available for the `create()` call:
   * **expirationTime** `Number` - time-to-live (TTL) in seconds for any given session data - MongoDB will auto-delete data which hasn't been updated for this amount of time. Default is 2 weeks.
   * **url** `String` - connection URL of the form** `mongodb://user:pass@host:port/database/collection`. If provided then this will take precedence over other options except** `mongoose`.
   * **mongoose** `Object` - a [Mongoose](https://github.com/LearnBoost/mongoose) connection, use** `mongoose.connection` to get the connection out of an existing Mongoose object.  If provided then this will take precedence over other options.
+
+## Cleaning up
+
+You can close all connections made through the storage layer using:
+
+```js
+var Promise = require('bluebird');
+var mongoStore = require('koa-session-mongo');
+
+...
+
+Promise.spawn(function() {
+  mongoStore.closeConnections();
+});
+```
 
 ## License
 

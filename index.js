@@ -30,76 +30,29 @@ var defaultOptions = {
 
 
 /**
- * @param collection {Object} collection object.
- * @constructor
- */
-var MongoStore = function(collection) {
-  this._findOne = Promise.promisify(collection.findOne, collection);
-  this._update = Promise.promisify(collection.update, collection);
-  this._remove = Promise.promisify(collection.remove, collection);
-};
-
-
-/**
- * Load data for given id.
- * @param sid {String} session id.
- * @return {String} data.
- */
-MongoStore.prototype.load = function*(sid) {
-  var data = yield this._findOne({_id: sid});
-  if (data && data._id) {
-    return data.blob;
-  } else {
-    return null;
-  }
-};
-
-
-/**
- * Save data for given id.
- * @param sid {String} session id.
- * @param blob {String} data to save.
- */
-MongoStore.prototype.save = function*(sid, blob) {
-  var data = {
-    _id: sid,
-    blob: blob,
-    updatedAt: new Date()
-  };
-
-  yield this._update({_id: sid}, data, { upsert: true, safe: true });
-};
-
-
-
-/**
- * Remove data for given id.
- * @param sid {String} session id.
- */
-MongoStore.prototype.remove = function*(sid) {
-  yield this._remove({_id: sid});
-};
-
-
-/**
- * List of opened db connections. So that we can cleanup later on.
- * @type {Array}
- */
-var openedDbConnections = [];
-
-
-
-/**
- * Connect to the db and load the collection.
- *
  * @param db {Object} MongoDB db object.
  * @param options {Object} connection options.
+ * @constructor
+ */
+var MongoStore = function(dbConn, options) {
+  this._dbConn = dbConn;
+  this._options = options;
+};
+
+
+
+/**
  *
- * @return {Promise} resolves to the collection
- *
+ * Setup the connection to the database.
  * @private
  */
-var _connect = Promise.coroutine(function*(dbConn, options) {
+MongoStore.prototype._connect = Promise.coroutine(function*() {
+  // already done?
+  if (this._ready) return;
+
+  var dbConn = this._dbConn,
+    options = this._options;
+
   var openedDb = null,
     collection = null;
 
@@ -140,8 +93,63 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
     throw new Error('Error creating index on ' + collectionName + ': ' + err.message);
   }
 
-  return collection;
+  this._findOne = Promise.promisify(collection.findOne, collection);
+  this._update = Promise.promisify(collection.update, collection);
+  this._remove = Promise.promisify(collection.remove, collection);
+  this._ready = true;
 });
+
+
+
+/**
+ * Load data for given id.
+ * @param sid {String} session id.
+ * @return {String} data.
+ */
+MongoStore.prototype.load = function*(sid) {
+  if (!this._ready) yield this._connect();
+  var data = yield this._findOne({_id: sid});
+  if (data && data._id) {
+    return data.blob;
+  } else {
+    return null;
+  }
+};
+
+
+/**
+ * Save data for given id.
+ * @param sid {String} session id.
+ * @param blob {String} data to save.
+ */
+MongoStore.prototype.save = function*(sid, blob) {
+  if (!this._ready) yield this._connect();
+  var data = {
+    _id: sid,
+    blob: blob,
+    updatedAt: new Date()
+  };
+
+  yield this._update({_id: sid}, data, { upsert: true, safe: true });
+};
+
+
+
+/**
+ * Remove data for given id.
+ * @param sid {String} session id.
+ */
+MongoStore.prototype.remove = function*(sid) {
+  if (!this._ready) yield this._connect();
+  yield this._remove({_id: sid});
+};
+
+
+/**
+ * List of opened db connections. So that we can cleanup later on.
+ * @type {Array}
+ */
+var openedDbConnections = [];
 
 
 /**
@@ -181,7 +189,7 @@ exports.closeConnections = function*() {
  * @param options.mongoose {Object} a mongoose connection, use mongooseDb.connections[0] to get the connection out of an
  * existing Mongoose object.  If provided then this will take precedence over other options.
  */
-exports.create = function*(options) {
+exports.create = function(options) {
   options = options || {};
   var dbConn = null;
 
@@ -265,7 +273,7 @@ exports.create = function*(options) {
   }
 
   debug('creating new store');
-  return new MongoStore(yield _connect(dbConn, options));
+  return new MongoStore(dbConn, options);
 };
 
 
