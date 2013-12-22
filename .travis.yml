@@ -11,7 +11,7 @@ before_script:
   - "npm install"
 
 script:
-  - "NODE_ENV=test node --harmony `which gulp`"
+  - "NODE_ENV=test node --harmony `which gulp` ci"
 
 notifications:
   email:

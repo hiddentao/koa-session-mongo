@@ -1,8 +1,8 @@
 var gulp = require('gulp');
 var mocha = require('gulp-mocha');
 
-gulp.task('tests', function () {
-  return gulp.src('test.js')
+gulp.task('basicTests', function () {
+  return gulp.src('tests/basic.test.js')
     .pipe(mocha({
       ui: 'bdd',
       reporter: 'spec'
@@ -10,6 +10,17 @@ gulp.task('tests', function () {
 });
 
 
-gulp.task('default', ['tests'], function() {});
+gulp.task('allTests', ['basicTests'], function () {
+  return gulp.src('tests/longRunning.test.js')
+    .pipe(mocha({
+      ui: 'bdd',
+      reporter: 'spec'
+    }))
+});
 
+
+gulp.task('default', ['allTests'], function() {});
+
+
+gulp.task('ci', ['basicTests'], function() {});
 

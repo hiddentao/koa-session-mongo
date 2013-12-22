@@ -11,7 +11,7 @@ var expect = chai.expect,
 
 var Promise = require('bluebird');
 
-var mongoSession = require('./');
+var mongoSession = require('../');
 var createSession = Promise.coroutine(mongoSession.create),
   closeConnections = Promise.coroutine(mongoSession.closeConnections);
 
@@ -555,69 +555,6 @@ describe('Mongo session layer tests', function() {
         .then(function(foundItem) {
           timeSince = foundItem.updatedAt.getTime() - oldTs.getTime();
           expect(0 < timeSince).to.be.true;
-        });
-    });
-
-  });
-
-  describe('when an entry gets too old', function() {
-    var store, sid;
-
-    beforeEach(function(done) {
-      sid = mongoose.Types.ObjectId();
-
-      createSession({
-        db: 'koa-session-mongo-test',
-        expirationTime: 0
-      })
-        .then(function(_store) {
-          store = {
-            save: Promise.coroutine(_store.save).bind(_store),
-            load: Promise.coroutine(_store.load).bind(_store),
-            remove: Promise.coroutine(_store.remove).bind(_store)
-          };
-        })
-        .then(function() {
-          return testCollection.remove();
-        })
-        .nodeify(done)
-      ;
-    });
-
-    it('gets automatically deleted', function() {
-      var NEED_TO_WAIT = 60;
-
-      this.timeout((NEED_TO_WAIT + 1)* 1000);  // it can take upto 60 seconds to
-
-      /* Auto-delete (mongoDB TTL) only works on 2.2+, so let's check the version before testing */
-      var adminDb = testDb.admin();
-      return Promise.promisify(adminDb.buildInfo, adminDb)()
-        .then(function(buildInfo) {
-          var versionTokens = buildInfo.version.split('.');
-          if (2 > parseInt(versionTokens[0]) || 2 > parseInt(versionTokens[1])) {
-            console.warn('Need MongoDB version 2.2 or above to test TTL. Skipping test.');
-            return;
-          } else {
-
-            return store.save(sid, 'blah')
-              .then(function() {
-                var resolver = Promise.defer();
-
-                console.log('Need to wait for upto ' + NEED_TO_WAIT + ' seconds... (see http://docs.mongodb.org/manual/tutorial/expire-data/)');
-                setTimeout(function() {
-                  resolver.resolve();
-                }, NEED_TO_WAIT * 1000);
-
-                return resolver.promise;
-              })
-              .then(function() {
-                return store.load(sid);
-              })
-              .then(function(data) {
-                expect(data).to.be.null;
-              });
-
-          }
         });
     });
 
