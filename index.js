@@ -4,6 +4,8 @@ MongoDB storage layer for koa-session-store.
 Based on https://github.com/kcbanner/connect-mongo
  */
 
+var debug = require('debug')('koa-session-mongo');
+
 var mongo = require('mongodb');
 var Promise = require('bluebird');
 var url = require('url');
@@ -98,6 +100,7 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
     collection = null;
 
   try {
+    debug('open db connection');
     openedDb = yield Promise.promisify(dbConn.open, dbConn)();
   } catch (err) {
     if (!(err instanceof Error)) {
@@ -109,6 +112,7 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
 
   if (options.username && options.password) {
     try {
+      debug('authenticate with %s:%s', options.username, options.password);
       yield Promise.promisify(openedDb.authenticate, openedDb)(options.username, options.password);
     } catch (err) {
       throw new Error('Error authenticating with ' + options.username + ': ' + err.message);
@@ -117,6 +121,7 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
 
   var collectionName = defaultOptions.collection || options.collection;
   try {
+    debug('open collection %s', collectionName);
     collection = yield Promise.promisify(openedDb.collection, openedDb)(collectionName);
   } catch (err) {
     throw new Error('Error opening collection ' + collectionName + ': ' + err.message);
@@ -124,6 +129,7 @@ var _connect = Promise.coroutine(function*(dbConn, options) {
 
   try {
     var expirationTime = options.expirationTime || options.defaultExpirationTime;
+    debug('create index on updatedAt with expiry %d', expirationTime);
     yield Promise.promisify(collection.ensureIndex, collection)({updatedAt: 1}, {expireAfterSeconds: expirationTime});
   } catch (err) {
     throw new Error('Error creating index on ' + collectionName + ': ' + err.message);
@@ -162,6 +168,7 @@ exports.create = function*(options) {
 
   // mongoose connection?
   if (options.mongoose_connection) {
+    debug('extract params from mongoose connection');
     if (options.mongoose_connection.user && options.mongoose_connection.pass) {
       options.username = options.mongoose_connection.user;
       options.password = options.mongoose_connection.pass;
@@ -179,6 +186,7 @@ exports.create = function*(options) {
   else {
     // url?
     if(options.url) {
+      debug('extract params from url %s', options.url);
       var db_url = url.parse(options.url);
 
       if (db_url.port) {
@@ -220,11 +228,13 @@ exports.create = function*(options) {
 
     // options.db already initialised?
     if ('object' === typeof options.db && 'function' === typeof options.db.open) {
+      debug('re-using node-mongo-native object');
       dbConn = options.db; // Assume it's an instantiated node-mongo-native Object
     } else {
       options.auto_reconnect = options.auto_reconnect || defaultOptions.auto_reconnect;
       options.ssl = options.ssl || defaultOptions.ssl;
 
+      debug('creating new node-mongo-native object');
       dbConn = new mongo.Db(options.db,
         new mongo.Server(
           options.host || defaultOptions.host,
@@ -235,6 +245,7 @@ exports.create = function*(options) {
     } // if options.db not an object
   }
 
+  debug('creating new store');
   return new MongoStore(yield _connect(dbConn, options));
 };
 
