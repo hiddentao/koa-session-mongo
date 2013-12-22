@@ -25,6 +25,116 @@ var defaultOptions = {
 
 
 
+
+
+/**
+ * @param collection {Object} collection object.
+ * @constructor
+ */
+var MongoStore = function(collection) {
+  this._collection = collection;
+  this._findOne = Promise.promisify(this._collection.findOne, this._collection);
+  this._update = Promise.promisify(this._collection.update, this._collection);
+  this._remove = Promise.promisify(this._collection.remove, this._collection);
+};
+
+
+/**
+ * Load data for given id.
+ * @param sid {String} session id.
+ * @return {String} data.
+ */
+MongoStore.prototype.load = function*(sid) {
+  var data = yield this._findOne({_id: sid});
+  if (data && data._id) {
+    return data.blob;
+  } else {
+    return null;
+  }
+};
+
+
+/**
+ * Save data for given id.
+ * @param sid {String} session id.
+ * @param blob {String} data to save.
+ */
+MongoStore.prototype.save = function*(sid, blob) {
+  var data = {
+    _id: sid,
+    blob: blob,
+    updatedAt: new Date()
+  };
+
+  yield this._update({_id: sid}, data, { upsert: true, safe: true });
+};
+
+
+
+/**
+ * Remove data for given id.
+ * @param sid {String} session id.
+ */
+MongoStore.prototype.remove = function*(sid) {
+  yield this._remove({_id: sid});
+};
+
+
+
+
+
+/**
+ * Connect to the db and load the collection.
+ *
+ * @param db {Object} MongoDB db object.
+ * @param options {Object} connection options.
+ *
+ * @return {Promise} resolves to the collection
+ *
+ * @private
+ */
+var _connect = Promise.coroutine(function*(dbConn, options) {
+  var openedDb = null,
+    collection = null;
+
+  try {
+    openedDb = yield Promise.promisify(dbConn.open, dbConn)();
+  } catch (err) {
+    if (!(err instanceof Error)) {
+      err = new Error(String(err));
+    }
+    err.message = 'Error opening db: ' + err.message;
+    throw err;
+  }
+
+  if (options.username && options.password) {
+    try {
+      yield Promise.promisify(openedDb.authenticate, openedDb)(options.username, options.password);
+    } catch (err) {
+      throw new Error('Error authenticating with ' + options.username + ': ' + err.message);
+    }
+  }
+
+  var collectionName = defaultOptions.collection || options.collection;
+  try {
+    collection = yield Promise.promisify(openedDb.collection, openedDb)(collectionName);
+  } catch (err) {
+    throw new Error('Error opening collection ' + collectionName + ': ' + err.message);
+  }
+
+  try {
+    var expirationTime = options.expirationTime || options.defaultExpirationTime;
+    yield Promise.promisify(collection.ensureIndex, collection)({updatedAt: 1}, {expireAfterSeconds: expirationTime});
+  } catch (err) {
+    throw new Error('Error creating index on ' + collectionName + ': ' + err.message);
+  }
+
+  return collection;
+});
+
+
+
+
 /**
  * Create a MongoDB store using given options.
  *
@@ -125,104 +235,7 @@ exports.create = function*(options) {
     } // if options.db not an object
   }
 
-  return MongoStore(yield _connect);
-};
-
-
-/**
- * Initiate db connection and load the collection.
- *
- * @param db {Object} MongoDB db object.
- * @param options {Object} connection options.
- *
- * @private
- */
-var _connect = function*(db, options) {
-  var openedDb = null,
-    collection = null;
-
-  try {
-    openedDb = yield Promise.promisify(db.open, db);
-  } catch (err) {
-    if (!(err instanceof Error)) { err = new Error(String(err)); }
-    err.message = 'Error opening db: ' + err.message;
-    throw err;
-  }
-
-  if (options.username && options.password) {
-    try {
-      yield Promise.promisify(openedDb.authenticate, openedDb).call(null, options.username, options.password);
-    } catch (err) {
-      throw new Error('Error authenticating with ' + options.username + ': ' + err.message);
-    }
-  }
-
-  try {
-    collection = yield Promise.promisify(openedDb.collection, openedDb).call(null, options.collection);
-  } catch (err) {
-    throw new Error('Error opening collection ' + options.collection + ': ' + err.message);
-  }
-
-  try {
-    var expirationTime = options.expirationTime || options.defaultExpirationTime;
-    yield Promise.promisify(collection.ensureIndex, collection).call(null, {updatedAt: 1}, {expireAfterSeconds: expirationTime});
-  } catch (err) {
-    throw new Error('Error creating index on ' + options.collection + ': ' + err.message);
-  }
-
-  return collection;
-};
-
-
-/**
- * @param collection {Object} the active db collection.
- * @constructor
- */
-var MongoStore = function(collection) {
-  this.collection = collection;
-};
-
-
-
-
-/**
- * Load data for given id.
- * @param sid {String} session id.
- * @return {String} data.
- */
-MongoStore.prototype.load = function*(sid) {
-  var data = yield Promise.promisify(this.collection.findOne, this.collection).call(null, {_id: sid});
-  if (data && data._id) {
-    return data.blob;
-  } else {
-    return null;
-  }
-};
-
-
-/**
- * Save data for given id.
- * @param sid {String} session id.
- * @param blob {String} data to save.
- */
-MongoStore.prototype.save = function*(sid, blob) {
-  var data = {
-    _id: sid,
-    blob: blob,
-    updatedAt: new Date()
-  };
-
-  yield Promise.promisify(this.collection.update, this.collection).call(null, {_id: sid}, data, { upsert: true, safe: true });
-};
-
-
-
-/**
- * Remove data for given id.
- * @param sid {String} session id.
- */
-MongoStore.prototype.remove = function*(sid) {
-  yield Promise.promisify(this.collection.remove, this.collection).call(null, {_id: sid});
+  return new MongoStore(yield _connect(dbConn, options));
 };
 
 

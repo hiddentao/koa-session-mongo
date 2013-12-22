@@ -22,7 +22,9 @@ var app = koa();
 app.keys = ['some secret key'];  // needed for cookie-signing
 
 app.use(session({
-  store: mongoSession.create(/* default configuration - see Options below */)
+  store: mongoSession.create({
+    db: 'database_name'
+  })
 }));
 
 app.use(function(next){
@@ -43,12 +45,13 @@ If you wish to specify host, port, etc:
 mongoSession.create({
   host: 'mongo.hostname.com',
   port: 48473,
+  db: 'database_name',
   username: 'admin',
-  password: '...',
+  password: 'password',
 })
 ```
 
-You can also pass in connection parameters as a URL string:
+Or you can pass in connection parameters as a URL string:
 
 ```js
 mongoSession.create({
@@ -56,7 +59,22 @@ mongoSession.create({
 })
 ```
 
-And you can use an existing [Mongoose](https://github.com/LearnBoost/mongoose) connection:
+Or you can use an existing [node-mongo-native](https://github.com/mongodb/node-mongodb-native) db object:
+
+```js
+var mongo = require('mongodb');
+
+var db = new mongo.Db("database_name", new mongo.Server('host', port, {}), { w: 1 });
+
+mongoSession.create({
+  db: dbConn,
+  collection: 'sessions',
+  username: 'admin',
+  password: 'password'
+})
+```
+
+Or you can use an existing [Mongoose](https://github.com/LearnBoost/mongoose) connection:
 
 ```js
 var mongoose = require('mongoose');
