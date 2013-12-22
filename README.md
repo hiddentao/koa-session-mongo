@@ -13,7 +13,6 @@ npm install koa-session-mongo
 ## Usage
 
 ```js
-var Promise = require('bluebird');
 var session = require('koa-session-store');
 var mongoStore = require('koa-session-mongo');
 var koa = require('koa');
