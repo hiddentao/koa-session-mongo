@@ -1,0 +1,15 @@
+language: node_js
+
+node_js:
+  - "0.11.9"
+
+before_script:
+  - "npm install -g gulp"
+  - "npm install"
+
+script:
+  - "NODE_ENV=test node --harmony `which gulp`"
+
+notifications:
+  email:
+    - ram@hiddentao.com

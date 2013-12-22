@@ -1,0 +1,34 @@
+{
+  "name": "koa-session-mongo",
+  "version": "0.1.0",
+  "description": "MongoDB storage layer for Koa session middleware",
+  "main": "index.js",
+  "scripts": {
+    "test": "NODE_ENV=test node --harmony `which gulp`"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/hiddentao/koa-session-mongo.git"
+  },
+  "keywords": [
+    "koa",
+    "session",
+    "mongodb",
+    "mongo",
+    "store"
+  ],
+  "author": "Ramesh Nair <ram@hiddentao.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hiddentao/koa-session-mongo/issues"
+  },
+  "homepage": "https://github.com/hiddentao/koa-session-mongo",
+  "dependencies": {
+    "mongodb": "~1.3.23",
+    "bluebird": "~0.11.5-1"
+  },
+  "devDependencies": {
+    "gulp": "~3.2.0",
+    "gulp-mocha": "~0.1.0"
+  }
+}
