@@ -13,36 +13,42 @@ npm install koa-session-mongo
 ## Usage
 
 ```js
+var Promise = require('bluebird');
 var session = require('koa-session-store');
 var mongoStore = require('koa-session-mongo');
 var koa = require('koa');
 
-var app = koa();
+Promise.spawn(function*() {
+  var app = koa();
 
-app.keys = ['some secret key'];  // needed for cookie-signing
+  app.keys = ['some secret key'];  // needed for cookie-signing
 
-app.use(session({
-  store: mongoStore.create({
-    db: 'database_name'
-  })
-}));
+  // could instead use Promise.coroutine() here if we like
+  var sessionStore = yield Promise.spawn(function() {
+    return mongoStore.create({
+      db: 'database_name'
+    });
+  });
 
-app.use(function(next){
-  return function *(){
-    var n = this.session.views || 0;
-    this.session.views = ++n;
-    this.body = n + ' views';
-  }
-})
+  app.use(session({
+    store: sessionStore
+  }));
 
-app.listen(3000);
-console.log('listening on port 3000');
+  app.use(function *(){
+      var n = this.session.views || 0;
+      this.session.views = ++n;
+      this.body = n + ' views';
+  });
+
+  app.listen(3000);
+  console.log('listening on port 3000');
+});
 ```
 
 If you wish to specify host, port, etc:
 
 ```js
-var store = mongoStore.create({
+mongoStore.create({
   host: 'mongo.hostname.com',
   port: 48473,
   db: 'database_name',
@@ -54,7 +60,7 @@ var store = mongoStore.create({
 Or you can pass in connection parameters as a URL string:
 
 ```js
-var store = mongoStore.create({
+mongoStore.create({
   url: 'mongodb://user:pass@host:port/database_name/collection_name'
 })
 ```
@@ -66,7 +72,7 @@ var mongo = require('mongodb');
 
 var db = new mongo.Db("database_name", new mongo.Server('host', port, {}), { w: 1 });
 
-var store = mongoStore.create({
+mongoStore.create({
   db: dbConn,
   collection: 'sessions',
   username: 'admin',
