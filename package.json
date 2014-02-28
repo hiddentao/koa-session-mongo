@@ -1,6 +1,6 @@
 {
   "name": "koa-session-mongo",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "MongoDB storage layer for Koa session middleware",
   "main": "index.js",
   "scripts": {
