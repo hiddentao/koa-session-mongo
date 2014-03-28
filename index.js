@@ -58,7 +58,8 @@ MongoStore.prototype._connect = Promise.coroutine(function*() {
 
   try {
     debug('open db connection');
-    openedDb = yield Promise.promisify(dbConn.open, dbConn)();
+    var dbConn_open = Promise.promisify(dbConn.open, dbConn);
+    openedDb = yield dbConn_open();
     openedDbConnections.push(openedDb);
   } catch (err) {
     if (!(err instanceof Error)) {

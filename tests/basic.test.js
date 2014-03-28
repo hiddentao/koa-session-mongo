@@ -23,7 +23,6 @@ describe('Mongo session layer tests', function() {
   var testDb, testCollection;
 
   before(function(done) {
-    console.log('Assuming that Mongod is running on 127.0.0.1 at port 27017');
     var dbConn = new mongo.Db("koa-session-mongo-test", new mongo.Server('127.0.0.1', 27017, {}), { w: 1 });
 
     Promise.promisify(dbConn.open, dbConn)()
