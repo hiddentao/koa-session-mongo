@@ -101,7 +101,7 @@ describe('Mongo session layer tests', function() {
           .then(function(store){
             return Promise.coroutine(store.load).bind(store)('abc');
           })
-          .should.be.rejectedWith('Error authenticating with admin: Authentication failed.');
+          .should.be.rejected;
       });
     });
 
@@ -204,7 +204,7 @@ describe('Mongo session layer tests', function() {
           .then(function(store){
             return Promise.coroutine(store.load).bind(store)('abc');
           })
-          .should.be.rejectedWith('Error authenticating with admin: Authentication failed.');
+          .should.be.rejected;
       });
     });
 
@@ -406,7 +406,7 @@ describe('Mongo session layer tests', function() {
           .then(function(store){
             return Promise.coroutine(store.load).bind(store)('abc');
           })
-          .should.be.rejectedWith('Error authenticating with admin: Authentication failed.');
+          .should.be.rejected;
       });
     });
 
