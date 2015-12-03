@@ -58,17 +58,27 @@ describe('Mongo session layer tests', function() {
   });
 
   describe('when native db object given', function() {
-    var testMongoNativeDb, options;
+    var testMongoNativeDb, dbIsOpen, options;
 
     beforeEach(function() {
       testMongoNativeDb = new mongo.Db("koa-session-mongo-test", new mongo.Server('127.0.0.1', 27017, {}), { w: 1 });
+
+      dbIsOpen = false;
+      testMongoNativeDb.on("open", function() {
+        dbIsOpen = true;
+      });
+
       options = {
         db: testMongoNativeDb
       };
     });
 
     afterEach(function(done) {
-      Promise.promisify(testMongoNativeDb.close, testMongoNativeDb)(true).nodeify(done);
+      if (dbIsOpen) {
+        testMongoNativeDb.close(true, done);
+      } else {
+        done();
+      }
     });
 
     it('returns the store', function(done) {
@@ -78,7 +88,7 @@ describe('Mongo session layer tests', function() {
           store.load.should.be.a('function');
           store.remove.should.be.a('function');
         })
-        .nodeify(done)
+        .nodeify(done);
       ;
     });
 
@@ -91,7 +101,7 @@ describe('Mongo session layer tests', function() {
           .then(function(store){
             return Promise.coroutine(store.load).bind(store)('abc');
           })
-          .should.be.rejectedWith('Error authenticating with admin: auth fails');
+          .should.be.rejectedWith('Error authenticating with admin: Authentication failed.');
       });
     });
 
@@ -194,7 +204,7 @@ describe('Mongo session layer tests', function() {
           .then(function(store){
             return Promise.coroutine(store.load).bind(store)('abc');
           })
-          .should.be.rejectedWith('Error authenticating with admin: auth fails');
+          .should.be.rejectedWith('Error authenticating with admin: Authentication failed.');
       });
     });
 
@@ -396,7 +406,7 @@ describe('Mongo session layer tests', function() {
           .then(function(store){
             return Promise.coroutine(store.load).bind(store)('abc');
           })
-          .should.be.rejectedWith('Error authenticating with admin: auth fails');
+          .should.be.rejectedWith('Error authenticating with admin: Authentication failed.');
       });
     });
 

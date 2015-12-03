@@ -89,7 +89,11 @@ describe('Mongo session layer long-running tests', function() {
       return Promise.promisify(adminDb.buildInfo, adminDb)()
         .then(function(buildInfo) {
           var versionTokens = buildInfo.version.split('.');
-          if (2 > parseInt(versionTokens[0]) || 2 > parseInt(versionTokens[1])) {
+          
+          var token0 = parseInt(versionTokens[0]),
+            token1 = parseInt(versionTokens[1]);
+
+          if (2 > token0 || (2 == token0 && 2 > token1)) {
             console.warn('Need MongoDB version 2.2 or above to test TTL. Skipping test.');
             return;
           } else {
